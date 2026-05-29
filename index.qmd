@@ -1,0 +1,165 @@
+---
+title: "Unsupervised Learning and Pre-Trained Models"
+subtitle: "DATA622-Lab8"
+format:
+  html: 
+    theme: litera
+    code-overflow: wrap
+    code-block-bg: true
+    highlight-style: flatly
+embed-resources: true
+toc: true
+toc-depth: 6
+toc-location: right
+editor: visual
+jupyter: python3
+---
+
+# Unsupervised Learning and Pre-Trained Models
+
+## Overview
+
+In Lab 8, we will be working with the Financial Phrasebank dataset that we
+explored in the vignettes, which you can find here [Pretrained
+Vignettes](https://colab.research.google.com/drive/1pvc99evah2QEWWtTO6tj6luiZR_sq4mr?usp=sharing).
+This dataset consists of a series of snippets of text, ranging from roughly 10
+to 90 words, describing an event that took place in the financial markets. This
+dataset is difficult for standard sentiment analysis tools because of the
+nuances of the languaged used by financial analysts. The dataset was annotated
+by experts, and we are using a subset of the dataset where the expert
+annotations all agreed. There are three classes in the dataset, 'positive',
+'negative', and 'neutral', exemplified by the following examples:
+
++------------------------------------------------+-------------+-------------+
+| Text                                           | Sentiment   | Value       |
++:===============================================+:===========:+:===========:+
+| Finnish Bank of Åland reports operating        | Negative    | 0           |
+| profit\                                        |             |             |
+| of EUR 2.2 mn in the first quarter of 2010,\   |             |             |
+| down from EUR 6.3 mn in the corresponding\     |             |             |
+| period in 2009.                                |             |             |
++------------------------------------------------+-------------+-------------+
+| The Samsung Mobile Applications Store was\     | Neutral     | 1           |
+| launched in January 2009 by Samsung Mobile\    |             |             |
+| Innovator, a program which enables mobile\     |             |             |
+| software developers to create applications     |             |             |
+| for\                                           |             |             |
+| use across Samsung mobile devices.             |             |             |
++------------------------------------------------+-------------+-------------+
+| Savon koulutuskuntayhtymä, Finland based\      | Positive    | 2           |
+| company has awarded contract for specialist\   |             |             |
+| agricultural or forestry machinery.            |             |             |
++------------------------------------------------+-------------+-------------+
+
+You can read more details about this dataset on hugging faces:
+[FinanceMTEB](https://huggingface.co/datasets/FinanceMTEB/financial_phrasebank),
+or in the following paper:
+
+::: {#ref .card .border-primary style="padding: 20px;"}
+Malo, P., Sinha, A., Korhonen, P., Wallenius, J., & Takala, P. (2014). "Good
+debt or bad debt: Detecting semantic orientations in economic texts." *Journal
+of the Association for Information Science and Technology*, *65*, 782–796.
+:::
+
+## Problem 1
+
+This assignment consists of a single problem. You have three different options,
+each based on training and tuning a class of models with 'optuna' to understand
+both how tuning can improve the results of training, but also to understand the
+how optimal values of hyperparameters vary with model complexity and training
+architecture. The three options range according to a trade-off between
+computational difficulty and model power. You may select between them based on
+your interests and available compute. The first two options are possible with T4
+GPUs (with the first one potentially requiring an hour long computation), but
+the third one is much more challenging and may require 4-plus hours on a T4 and
+the savvy needed to make sure everything is correct before starting the run.
+
+The code examples in this week's vignette can be modified directly to solve the
+computational part of this problem. Read the extra credit first to see if you
+want to do it because you will want to design your simulations with it in mind.
+
+I recommend you take the same approach that I did in the vignette with respect
+to training, testing, and validation, which is to split the test 50/50 set into
+a validation set and testing set and use the entire training set for training.
+This gives you a roughly 1% standard error on your test accuracy and let's you
+maximize the amount of training data.
+
+::: {.card .text-white .bg-primary .card-title style="padding: 10px; text-align: center;"}
+Option 1
+:::
+
+## Finding Diminishing Returns for LSTM
+
+In this option, you will look at how the test accuracy and best hyperparameters
+vary based on network width. Perform a loop over network widths starting at 4
+and increasing rapidly, e.g. (say 32, 4, 8, 32, 256, and 1028) and a single
+network depth (1, 2, or 3 LSTM layers). For each width, perform an 'optuna'
+study to find the best values of the following parameters: 'learning rate',
+'weight decay', 'epochs', and 'dropout'. You may use early stopping with a
+'patience' parameter in-lieu of 'epochs'. Report how the optimal hyperparameters
+vary depending on network width, and also discuss the model performance. Perform
+between 10 and 20 trials in each study. Describe the general pattern that you
+observe. What do the results tell you about the importance of the embeddings
+versus the LSTM architecture? Report what you observe not what you expected to
+see.
+
+Tip: For the highest accuracy, use BERT embeddings. To make that run fast,
+"pre-load" those embeddings by transforming the data using them. This prevents
+fine-tuning the embedding but prevents a costly loading step. This is discussed
+in the vignette notebook.
+
+::: {.card .text-white .bg-primary .card-title style="padding: 10px; text-align: center;"}
+Option 2
+:::
+
+## Unfreezing BERT
+
+In this option, you will look at how test accuracy and optimal hyperparameters
+vary based on the number of unfrozen BERT layers. Perform a loop over the number
+of unfrozen layers, (I recommend '\[0,2,4,8,12\]', but you can tune based on
+your ambition and compute resources), and for each selection of unfrozen layers,
+perform an 'optuna' study to find the best accuracy and training
+hyperparameters. For the 'optuna' study, vary the 'learning rate' and 'weight
+decay'. I recommend using early stopping with patience=2 and a maximum of 10
+epochs for training. Report your results. At what point does diminishing returns
+kick in for adding layers? What patterns do you observe in terms of how the best
+hyperparameters vary with number of layers? Report what you observe not what you
+expected to see.
+
+::: {.card .text-white .bg-primary .card-title style="padding: 10px; text-align: center;"}
+Option 3
+:::
+
+### Fine-Tuning Qwen 2.5
+
+In this option, you will be fine tuning a small (0.5B parameters) open weights
+model called Qwen 2.5. Here you have the option of unfreezing different elements
+of each transformer block of Qwen. [This
+article](https://reintech.io/blog/how-to-fine-tune-llms-with-lora-and-qlora-practical-guide)
+suggests three levels of fine tuning based on the targeted modules: a minimal
+level which includes just 'q_proj' and 'v_proj' (the question and value layers),
+an all-attention level which also includes 'k_proj', and 'o_proj', and an
+all-linear level which includes all of the above and 'gate_proj', 'up_proj', and
+'down_proj'. If you are interested, you may also test the all-MLP level, which
+is just 'gate_proj', 'up_proj', and 'down_proj'. For each of the levels, perform
+an 'optuna' study that finds the best values of the 'lora_r', the
+'lora_dropout', the 'lora_alpha', and the 'learning_rate'. Train for 3-5 epochs
+for each trial. Are there meaningful differences in accuracy between the best
+trials for each level of freezing? What patterns do you observe with the optimal
+hyperparameters? For each of the best models identified by 'optuna', calculate
+the number of hyperparameters being tuned to find the fune-tuning prescription
+that is most efficient in terms of parameters. Report what you observe not what
+you expected to see.
+
+--------------------------------------------------------------------------------
+
+### Extra Credit {#sec-extra-credit .card .border-secondary}
+
+### Are some sentences intrinsically difficult? (5 Points)
+
+To solve this problem, you must calculate the indices of incorrectly classified
+training examples either for the best model of each 'optuna' study or for the
+trained model of each 'optuna' trial. Calculate the accuracy for each question
+in the combined test and validation set across all the models. Is there evidence
+that some texts are intrinsically more difficult to classify? If so, print the 5
+most difficult examples and hypothesize on why they are hard to classify.
